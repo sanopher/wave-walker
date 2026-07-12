@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAVE WALKER</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Share+Tech+Mono&display=swap');
+        
+        :root {
+            --neon-green: #39ff14;
+            --neon-glow: 0 0 10px #39ff14, 0 0 20px #39ff14, 0 0 30px #39ff14;
+        }
+
+        body {
+            background-color: #050505;
+            color: #d1d5db;
+            font-family: 'Share Tech Mono', monospace;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        .title-font {
+            font-family: 'Creepster', cursive;
+            color: var(--neon-green);
+            text-shadow: var(--neon-glow);
+            letter-spacing: 2px;
+        }
+
+        .neon-text {
+            color: var(--neon-green);
+            text-shadow: 0 0 5px var(--neon-green);
+        }
+
+        .neon-btn {
+            background: transparent;
+            color: var(--neon-green);
+            border: 2px solid var(--neon-green);
+            box-shadow: 0 0 10px var(--neon-green) inset, 0 0 10px var(--neon-green);
+            text-transform: uppercase;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .neon-btn:hover:not(:disabled) {
+            background: var(--neon-green);
+            color: #000;
+            box-shadow: 0 0 20px var(--neon-green) inset, 0 0 20px var(--neon-green);
+        }
+
+        .neon-btn:disabled {
+            border-color: #555;
+            color: #555;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        .screen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* Fog Animation Background */
+        .fog-bg {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.1"/></svg>');
+            pointer-events: none;
+            z-index: 0;
+            animation: drift 60s linear infinite;
+        }
+
+        @keyframes drift {
+            from { background-position: 0 0; }
+            to { background-position: 1000px 1000px; }
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 30px #000;
+            border: 4px solid #111;
+            width: min(92vw, 900px);
+            height: min(92vw, 900px);
+            max-height: calc(100vh - 140px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            background-color: #111;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .hud-panel {
+            background: rgba(0, 20, 0, 0.8);
+            border: 1px solid var(--neon-green);
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
+        }
+
+        .health-bar {
+            width: 100%;
+            height: 10px;
+            background: #333;
+            border: 1px solid #0f0;
+        }
+        
+        .health-fill {
+            height: 100%;
+            background: var(--neon-green);
+            width: 100%;
+            transition: width 0.3s;
+        }
+
+        .power-fill {
+            height: 100%;
+            background: #0ff;
+            width: 100%;
+            transition: width 0.3s;
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            z-index: 60;
+            border: 1px solid #4b5563;
+            color: #9ca3af;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 0.5rem 0.9rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .back-btn:hover {
+            background: #1f2937;
+            color: #f3f4f6;
+        }
+
+        .game-message {
+            position: absolute;
+            top: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+            padding: 0.7rem 1rem;
+            border: 1px solid rgba(57, 255, 20, 0.5);
+            background: rgba(0, 0, 0, 0.8);
+            color: #39ff14;
+            text-shadow: 0 0 8px #39ff14;
+            border-radius: 999px;
+            font-size: 0.95rem;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="fog-bg"></div>
+
+    <!-- Audio Settings -->
+    <button id="btn-sound" class="absolute top-4 right-4 z-50 neon-text border border-green-500 px-3 py-1 bg-black bg-opacity-50">
+        Sound: ON
+    </button>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active z-10">
+        <button onclick="goBack()" class="back-btn">Back</button>
+        <h1 class="title-font text-7xl mb-8">WAVE WALKER</h1>
+        <div class="bg-black bg-opacity-80 p-8 rounded border border-green-900 shadow-2xl w-96 text-center z-10">
+            <h2 class="text-2xl neon-text mb-6">Enter the Maze</h2>
+            <input type="text" id="username" placeholder="Username" class="w-full mb-4 p-3 bg-gray-900 text-white border border-gray-700 focus:border-green-500 outline-none rounded">
+            <input type="password" id="password" placeholder="Password" class="w-full mb-6 p-3 bg-gray-900 text-white border border-gray-700 focus:border-green-500 outline-none rounded">
+            <div class="flex gap-4">
+                <button onclick="auth('login')" class="neon-btn w-1/2 py-2 rounded">Login</button>
+                <button onclick="auth('register')" class="neon-btn w-1/2 py-2 rounded">Register</button>
+            </div>
+            <p id="auth-msg" class="mt-4 text-red-500 text-sm h-4"></p>
+        </div>
+    </div>
+
+    <!-- Story Intro -->
+    <div id="story-screen" class="screen z-10">
+        <button onclick="showScreen('main-menu')" class="back-btn">Skip</button>
+        <div class="w-full max-w-3xl px-6 py-8 bg-black bg-opacity-80 rounded border border-green-900 shadow-2xl z-10 text-center">
+            <h1 class="title-font text-5xl mb-6">The City of the Broken Dawn</h1>
+            <p class="text-lg text-gray-300 leading-8 mb-4">
+                The city has fallen under the shadow of a terrifying monster called the Shadow Maw. Its darkness has swallowed the streets, silenced the people, and locked the land in fear.
+            </p>
+            <p class="text-lg text-gray-300 leading-8 mb-4">
+                Only one hero can stand against it: Wave Walker. To defeat the beast, he must recover the three fragments of the ancient sword, each hidden inside a deadly maze beneath the city.
+            </p>
+            <p class="text-lg text-gray-300 leading-8 mb-6">
+                Once the pieces are gathered, Wave Walker will forge the sword once more and free the city from the monster’s grip.
+            </p>
+            <button onclick="showScreen('main-menu')" class="neon-btn px-8 py-2 rounded font-bold">Begin the Hunt</button>
+        </div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="screen z-10">
+        <button onclick="goBack()" class="back-btn">Back</button>
+        <h1 class="title-font text-6xl mb-8">Main Menu</h1>
+        <div class="w-full max-w-md mb-6 rounded border border-green-900 bg-black/70 p-4 shadow-2xl z-10">
+            <div class="text-center text-sm uppercase tracking-[0.3em] text-green-400 mb-3">Ancient Sword</div>
+            <div id="sword-progress" class="flex justify-center"></div>
+            <div id="sword-progress-text" class="mt-3 text-center text-sm text-gray-400">0/3 fragments recovered</div>
+        </div>
+        <div class="flex flex-col gap-6 w-64 z-10">
+            <button id="btn-lvl-1" onclick="openDashboard(1)" class="neon-btn py-3 text-xl rounded font-bold">Level 1</button>
+            <button id="btn-lvl-2" onclick="openDashboard(2)" class="neon-btn py-3 text-xl rounded font-bold" disabled>Level 2 (Locked)</button>
+            <button id="btn-lvl-3" onclick="openDashboard(3)" class="neon-btn py-3 text-xl rounded font-bold" disabled>Level 3 (Locked)</button>
+            <button id="btn-lvl-4" onclick="openDashboard(4)" class="neon-btn py-3 text-xl rounded font-bold" disabled>Final Battle (Locked)</button>
+            <button onclick="logout()" class="mt-8 border border-red-600 text-red-500 hover:bg-red-600 hover:text-white py-2 rounded transition">Logout</button>
+        </div>
+    </div>
+
+    <!-- Level Dashboard -->
+    <div id="level-dashboard" class="screen z-10">
+        <button onclick="goBack()" class="back-btn">Back</button>
+        <div class="w-full max-w-4xl px-4 z-10">
+            <h2 id="dash-title" class="title-font text-5xl mb-6 text-center">Level 1</h2>
+            <div class="grid md:grid-cols-[1.1fr_0.9fr] gap-6 items-start">
+                <div class="bg-black bg-opacity-80 p-6 rounded border border-green-900 shadow-2xl">
+                    <h3 class="text-xl neon-text mb-4 text-center border-b border-green-900 pb-2">How to Play</h3>
+                    <ul id="level-instructions" class="space-y-3 text-left text-gray-300">
+                        <li>• Use the arrow keys to move through the maze.</li>
+                        <li>• Press Space to activate Echo Power and light the path.</li>
+                        <li>• Collect sword fragments and batteries to gain Hero Spirit.</li>
+                    </ul>
+                </div>
+
+                <div class="bg-black bg-opacity-80 p-6 rounded border border-green-900 shadow-2xl">
+                    <h3 class="text-xl neon-text mb-4 text-center border-b border-green-900 pb-2">Top 3 Clear Times</h3>
+                    <ul id="leaderboard-list" class="space-y-3">
+                        <!-- Injected via JS -->
+                    </ul>
+                </div>
+            </div>
+
+            <div class="flex justify-center gap-6 mt-8 z-10">
+                <button onclick="showScreen('main-menu')" class="border border-gray-500 text-gray-400 hover:bg-gray-800 py-2 px-6 rounded">Back</button>
+                <button onclick="startGame()" class="neon-btn py-2 px-10 text-xl rounded font-bold">PLAY</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen bg-black px-2 py-2">
+        <button onclick="goBack()" class="back-btn">Back</button>
+        <div class="w-full max-w-7xl flex flex-wrap justify-between items-center gap-3 p-3 mb-2 hud-panel z-10 rounded-b-lg">
+            <div class="flex gap-8">
+                <div><span class="text-gray-400">Player:</span> <span id="hud-name" class="neon-text font-bold"></span></div>
+                <div><span class="text-gray-400">Level:</span> <span id="hud-level" class="neon-text font-bold"></span></div>
+                <div><span class="text-gray-400">Hero Spirit:</span> <span id="hud-score" class="text-yellow-400 font-bold">0</span></div>
+                <div><span class="text-gray-400">Time:</span> <span id="hud-time" class="text-white">0</span>s</div>
+            </div>
+            <div class="flex gap-6 items-center">
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400 text-sm">ECHO</span>
+                    <div class="health-bar w-24"><div id="hud-power" class="power-fill" style="width: 100%"></div></div>
+                </div>
+                <div id="hud-hp-container" class="flex items-center gap-2 hidden">
+                    <span class="text-gray-400 text-sm">HP</span>
+                    <div class="health-bar w-24 border-red-500"><div id="hud-hp" class="health-fill bg-red-500" style="width: 100%"></div></div>
+                </div>
+                <div id="boss-hp-container" class="flex items-center gap-2 hidden">
+                    <span class="text-gray-400 text-sm">MAW</span>
+                    <div class="health-bar w-24 border-red-500"><div id="boss-hp" class="health-fill bg-red-600" style="width: 100%"></div></div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400 text-sm">Batt:</span> <span id="hud-batt" class="text-blue-400 font-bold">0</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400 text-sm">Key:</span> <span id="hud-key" class="text-red-500 font-bold">NO</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400 text-sm">Pieces:</span> <span id="hud-fragments" class="text-yellow-400 font-bold">0/3</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-gray-300">
+                    <span>Battery: <span id="hud-battery-left" class="text-cyan-400 font-bold">0/0</span></span>
+                    <span>Key Left: <span id="hud-key-left" class="text-yellow-400 font-bold">0/0</span></span>
+                    <span>Power: <span id="hud-battery-percent" class="text-cyan-400 font-bold">100%</span></span>
+                </div>
+                <div id="hud-ammo-container" class="flex items-center gap-2 hidden">
+                    <span class="text-gray-400 text-sm">Ammo:</span> <span id="hud-ammo" class="text-yellow-500 font-bold"></span>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-container" class="z-10 relative">
+            <div id="battery-alert" class="hidden absolute inset-0 z-40 items-center justify-center pointer-events-none">
+                <div class="bg-red-600/90 text-white px-8 py-4 rounded-xl text-2xl font-bold shadow-2xl border border-red-300">
+                    Battery is over!
+                </div>
+            </div>
+            <div id="game-message" class="game-message hidden"></div>
+            <canvas id="gameCanvas" width="720" height="720"></canvas>
+        </div>
+        
+        <div class="mt-2 text-gray-500 text-sm z-10 text-center px-2">
+            Controls: [Arrows] Move | [Space] Echo Power (Cost: 20%) <span id="control-f" class="hidden">| [F] Shoot</span>
+        </div>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory-screen" class="screen z-20 bg-opacity-95 bg-black">
+        <button onclick="goBack()" class="back-btn">Back</button>
+        <h1 class="title-font text-6xl text-yellow-400 text-shadow-lg shadow-yellow-500 mb-6">THE SWORD IS REBORN</h1>
+        <div class="text-2xl mb-2">Final Hero Spirit: <span id="vic-score" class="neon-text font-bold"></span></div>
+        <div class="text-xl text-gray-400 mb-4">Time: <span id="vic-time"></span>s</div>
+        <div class="text-lg text-gray-300 mb-8 max-w-2xl px-4">
+            Wave Walker has recovered another fragment of the ancient blade. The city trembles as the final piece draws near, and the Shadow Maw grows weaker with every step.
+        </div>
+        <div class="flex gap-4">
+            <button onclick="showScreen('main-menu')" class="border border-gray-500 hover:bg-gray-800 py-2 px-6 rounded">Main Menu</button>
+            <button onclick="openDashboard(currentLevel)" class="border border-cyan-500 text-cyan-500 hover:bg-cyan-900 py-2 px-6 rounded">Dashboard</button>
+            <button onclick="startGame()" class="border border-green-500 text-green-500 hover:bg-green-900 py-2 px-6 rounded">Play Again</button>
+            <button id="btn-next-level" onclick="openDashboard(currentLevel + 1)" class="neon-btn py-2 px-6 rounded">Next Level</button>
+        </div>
+    </div>
+
+    <!-- Boss Screen -->
+    <div id="boss-screen" class="screen z-20 bg-opacity-95 bg-black">
+        <button onclick="goBack()" class="back-btn">Back</button>
+        <h1 class="title-font text-6xl text-red-600 mb-6" style="text-shadow: 0 0 20px red;">THE SHADOW MAW</h1>
+        <p class="text-xl text-gray-300 mb-4 max-w-2xl text-center">The three fragments of the ancient sword are now united. Wave Walker can finally confront the monster that captured the city.</p>
+        <p class="text-lg text-yellow-400 mb-8">Every piece of the sword has been collected. The beast is vulnerable and the final battle can begin.</p>
+        <div class="flex gap-4">
+            <button onclick="showScreen('main-menu')" class="border border-gray-500 hover:bg-gray-800 py-2 px-6 rounded">Main Menu</button>
+            <button onclick="showScreen('main-menu')" class="neon-btn py-2 px-6 rounded">Kill the Monster</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameover-screen" class="screen z-20 bg-opacity-95 bg-black">
+        <button onclick="goBack()" class="back-btn">Back</button>
+        <h1 class="title-font text-6xl text-red-600 mb-6" style="text-shadow: 0 0 20px red;">YOU DIED</h1>
+        <div class="text-2xl mb-10">Final Hero Spirit: <span id="go-score" class="text-red-400 font-bold"></span></div>
+        <div class="flex gap-4">
+            <button onclick="showScreen('main-menu')" class="border border-gray-500 hover:bg-gray-800 py-2 px-6 rounded">Main Menu</button>
+            <button onclick="startGame()" class="border border-red-500 text-red-500 hover:bg-red-900 py-2 px-6 rounded">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Game Data & State ---
+        let currentUser = null;
+        let unlockedLevel = 1;
+        let currentLevel = 1;
+        let soundEnabled = true;
+        let fragmentProgress = {1: false, 2: false, 3: false};
+        let finalBossUnlocked = false;
+        let finalBoss = null;
+
+        // --- Maps (0: floor, 1: wall, 2: exit, 3: key, 4: battery, 5: start, 6: toggle wall, 7: enemy, 8: sword fragment) ---
+        const levelMaps = {
+            1: [
+                "111111111111111",
+                "150001000400001",
+                "101101011111101",
+                "100100010000101",
+                "110111010110101",
+                "100001300010101",
+                "101101111010101",
+                "100100000010801",
+                "110111111111101",
+                "100000001000001",
+                "101111101011101",
+                "101004100000101",
+                "101011111110101",
+                "140000000010021",
+                "111111111111111"
+            ],
+            2: [
+                "111111111111111",
+                "150000010000401",
+                "101111010111101",
+                "100001610100001",
+                "111101010101111",
+                "130101000101401",
+                "110101111101011",
+                "100060000060001",
+                "110111111111011",
+                "100100010001008",
+                "101101060101101",
+                "100001111100001",
+                "111100000001111",
+                "140001111100021",
+                "111111111111111"
+            ],
+            3: [
+                "111111111111111",
+                "150001040100001",
+                "101101010101101",
+                "101300010000101",
+                "101011111110101",
+                "100018000010001",
+                "111010111010111",
+                "140000070000041", // 7 = enemy start
+                "111011111110111",
+                "100010000010001",
+                "101010111010101",
+                "101000010000101",
+                "101101010101101",
+                "100001070100021", // 7 = enemy start
+                "111111111111111"
+            ],
+            4: [
+                "111111111111111",
+                "100000000000001",
+                "101111111111101",
+                "100000000000001",
+                "101111111111101",
+                "100000000000001",
+                "101111111111101",
+                "100000000000001",
+                "101111111111101",
+                "100000000000001",
+                "101111111111101",
+                "100000000000001",
+                "101111111111101",
+                "100000000000021",
+                "111111111111111"
+            ]
+        };
+
+        // --- Audio Synthesizer (No External Files) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const actx = new AudioContext();
+
+        function playTone(freq, type, duration, vol=0.1, slideFreq=null) {
+            if (!soundEnabled) return;
+            if (actx.state === 'suspended') actx.resume();
+            const osc = actx.createOscillator();
+            const gain = actx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, actx.currentTime);
+            if (slideFreq) osc.frequency.exponentialRampToValueAtTime(slideFreq, actx.currentTime + duration);
+            gain.gain.setValueAtTime(vol, actx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(actx.destination);
+            osc.start();
+            osc.stop(actx.currentTime + duration);
+        }
+
+        const sfx = {
+            step: () => playTone(100, 'square', 0.1, 0.05, 50),
+            battery: () => { playTone(400, 'sine', 0.1, 0.1, 600); setTimeout(()=>playTone(600, 'sine', 0.2, 0.1, 800), 100); },
+            key: () => playTone(1200, 'triangle', 0.3, 0.1, 1500),
+            echo: () => playTone(150, 'sawtooth', 1.0, 0.2, 50),
+            shoot: () => playTone(300, 'square', 0.2, 0.1, 50),
+            hurt: () => playTone(100, 'sawtooth', 0.5, 0.3, 40),
+            win: () => { playTone(400, 'square', 0.2); setTimeout(()=>playTone(500, 'square', 0.2), 200); setTimeout(()=>playTone(600, 'square', 0.4), 400); },
+            bgm: null,
+            startBgm: () => {
+                if(!soundEnabled) return;
+                sfx.stopBgm();
+                const osc = actx.createOscillator();
+                const gain = actx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = 60;
+                gain.gain.value = 0.05;
+                
+                // Add LFO for creepy wobble
+                const lfo = actx.createOscillator();
+                lfo.frequency.value = 0.5;
+                const lfoGain = actx.createGain();
+                lfoGain.gain.value = 10;
+                lfo.connect(lfoGain);
+                lfoGain.connect(osc.frequency);
+                
+                osc.connect(gain);
+                gain.connect(actx.destination);
+                osc.start();
+                lfo.start();
+                sfx.bgm = {osc, lfo, gain};
+            },
+            stopBgm: () => {
+                if(sfx.bgm) {
+                    sfx.bgm.osc.stop();
+                    sfx.bgm.lfo.stop();
+                    sfx.bgm = null;
+                }
+            }
+        };
+
+        document.getElementById('btn-sound').addEventListener('click', (e) => {
+            soundEnabled = !soundEnabled;
+            e.target.innerText = `Sound: ${soundEnabled ? 'ON' : 'OFF'}`;
+            if(!soundEnabled) sfx.stopBgm();
+            else if(document.getElementById('game-screen').classList.contains('active')) sfx.startBgm();
+        });
+
+        // --- UI Flow & API ---
+        let currentScreen = 'login-screen';
+        let screenHistory = [];
+
+        function stopGameLoop() {
+            if (gameLoopId) {
+                cancelAnimationFrame(gameLoopId);
+                gameLoopId = null;
+            }
+            isPlaying = false;
+        }
+
+        function showScreen(id, pushHistory = true) {
+            if (currentScreen === 'game-screen' && id !== 'game-screen') {
+                stopGameLoop();
+            }
+            if (pushHistory && currentScreen && currentScreen !== id) {
+                screenHistory.push(currentScreen);
+            }
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            currentScreen = id;
+            if(id !== 'game-screen') sfx.stopBgm();
+        }
+
+        function goBack() {
+            if (screenHistory.length > 0) {
+                const previous = screenHistory.pop();
+                if (previous && document.getElementById(previous)) {
+                    showScreen(previous, false);
+                    return;
+                }
+            }
+            showScreen('login-screen', false);
+        }
+
+        async function api(endpoint, data = null, method = 'POST') {
+            const options = {
+                method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+            if (data) options.body = JSON.stringify(data);
+            try {
+                const res = await fetch(`/api/${endpoint}`, options);
+                return await res.json();
+            } catch (e) {
+                console.error(e);
+                return { success: false, message: 'Server error. Is Python running?' };
+            }
+        }
+
+        async function auth(action) {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const msg = document.getElementById('auth-msg');
+            
+            if(!u || !p) return msg.innerText = "Please enter username and password.";
+            msg.innerText = "Processing...";
+            
+            const res = await api(action, {username: u, password: p});
+            if(res.success) {
+                currentUser = u;
+                unlockedLevel = res.unlocked || 1;
+                loadFragmentProgress();
+                updateMenu();
+                showScreen('story-screen');
+            } else {
+                msg.innerText = res.message || "Authentication failed.";
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('auth-msg').innerText = '';
+            renderSwordProgress();
+            showScreen('login-screen');
+        }
+
+        function saveFragmentProgress() {
+            if (!currentUser) return;
+            localStorage.setItem(`wavewalker-fragments-${currentUser}`, JSON.stringify(fragmentProgress));
+        }
+
+        function loadFragmentProgress() {
+            if (!currentUser) return;
+            const stored = localStorage.getItem(`wavewalker-fragments-${currentUser}`);
+            if (!stored) return;
+            try {
+                const parsed = JSON.parse(stored);
+                fragmentProgress = {1: false, 2: false, 3: false, ...parsed};
+                finalBossUnlocked = Object.values(fragmentProgress).filter(Boolean).length >= 3;
+            } catch (e) {
+                console.error('Failed to load fragment progress', e);
+            }
+        }
+
+        function renderSwordProgress() {
+            const container = document.getElementById('sword-progress');
+            const text = document.getElementById('sword-progress-text');
+            const recovered = Object.values(fragmentProgress).filter(Boolean).length;
+            const slots = [1, 2, 3].map(level => {
+                const active = fragmentProgress[level];
+                return `
+                    <div class="flex flex-col items-center mx-2">
+                        <div class="text-[10px] uppercase tracking-[0.2em] ${active ? 'text-yellow-300' : 'text-gray-500'} mb-1">L${level}</div>
+                        <div class="w-10 h-10 rounded-full border ${active ? 'border-yellow-400 shadow-[0_0_12px_#facc15]' : 'border-gray-700'} flex items-center justify-center bg-black/80">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                                <path d="M7 3L13 9L10 12L16 18L14 20L8 14L5 17L3 15L7 11L4 8L7 3Z" fill="${active ? '#facc15' : '#374151'}"/>
+                            </svg>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            container.innerHTML = `
+                <div class="flex items-center justify-center">
+                    <svg width="220" height="90" viewBox="0 0 220 90" class="drop-shadow-[0_0_12px_rgba(250,204,21,0.25)]">
+                        <rect x="20" y="34" width="26" height="18" rx="4" fill="#4b5563"/>
+                        <path d="M46 34H170L188 44L170 54H46Z" fill="#0f172a" stroke="#6b7280" stroke-width="2"/>
+                        <path d="M170 34H188L202 44L188 54H170" fill="#1f2937" stroke="#9ca3af" stroke-width="2"/>
+                        <circle cx="72" cy="44" r="9" fill="${fragmentProgress[1] ? '#facc15' : '#111827'}" stroke="${fragmentProgress[1] ? '#fde68a' : '#374151'}" stroke-width="2"/>
+                        <circle cx="110" cy="44" r="9" fill="${fragmentProgress[2] ? '#facc15' : '#111827'}" stroke="${fragmentProgress[2] ? '#fde68a' : '#374151'}" stroke-width="2"/>
+                        <circle cx="148" cy="44" r="9" fill="${fragmentProgress[3] ? '#facc15' : '#111827'}" stroke="${fragmentProgress[3] ? '#fde68a' : '#374151'}" stroke-width="2"/>
+                    </svg>
+                </div>
+                <div class="flex justify-center gap-2 mt-2">${slots}</div>
+            `;
+            text.innerText = `${recovered}/3 fragments recovered`;
+        }
+
+        function updateMenu() {
+            const btn2 = document.getElementById('btn-lvl-2');
+            const btn3 = document.getElementById('btn-lvl-3');
+            const btn4 = document.getElementById('btn-lvl-4');
+            
+            if (unlockedLevel >= 2) {
+                btn2.disabled = false;
+                btn2.innerText = "Level 2";
+            }
+            if (unlockedLevel >= 3) {
+                btn3.disabled = false;
+                btn3.innerText = "Level 3";
+            }
+            if (finalBossUnlocked) {
+                btn4.disabled = false;
+                btn4.innerText = "Final Battle";
+            }
+            renderSwordProgress();
+        }
+
+        function getLevelInstructions(lvl) {
+            if (lvl === 2) {
+                return [
+                    '• The second fragment of the sword lies deep inside the shifting ruins.',
+                    '• Use the arrow keys to move through the maze.',
+                    '• Press Space to activate Echo Power and light the path.',
+                    '• Some doors open and close, so time your moves carefully.'
+                ];
+            }
+            if (lvl === 3) {
+                return [
+                    '• The final fragment is guarded by the Shadow Maw’s hunters.',
+                    '• Use the arrow keys to move through the maze.',
+                    '• Press Space to turn on Echo Power and light the path.',
+                    '• Press F to shoot the enemy.',
+                    '• You only have 5 shots. Each shot uses 1 ammo.'
+                ];
+            }
+            if (lvl === 4) {
+                return [
+                    '• The sword is now complete. The final battle begins here.',
+                    '• Reach the Shadow Maw and strike it down with the forged blade.',
+                    '• Use the path of the final chamber to enter the monster’s lair.'
+                ];
+            }
+            return [
+                '• The first fragment of the sword is hidden in the drowned maze.',
+                '• Use the arrow keys to move through the maze.',
+                '• Press Space to activate Echo Power and light the path.',
+                '• Collect the key, then reach the exit portal.'
+            ];
+        }
+
+        async function openDashboard(lvl) {
+            currentLevel = lvl;
+            document.getElementById('dash-title').innerText = lvl === 4 ? 'Final Battle' : `Level ${lvl} ${lvl===3?'(DANGER)':' '}`;
+            
+            const instructions = document.getElementById('level-instructions');
+            instructions.innerHTML = getLevelInstructions(lvl).map(item => `<li>${item}</li>`).join('');
+
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = '<li class="text-gray-500">Loading...</li>';
+            showScreen('level-dashboard');
+
+            const res = await api(`leaderboard/${lvl}`, null, 'GET');
+            list.innerHTML = '';
+            if(res.scores && res.scores.length > 0) {
+                const sortedScores = [...res.scores].sort((a, b) => (a.time ?? a.score ?? 0) - (b.time ?? b.score ?? 0));
+                sortedScores.forEach((s, i) => {
+                    const clearTime = s.time ?? s.score ?? 0;
+                    list.innerHTML += `<li class="flex justify-between ${i===0?'text-yellow-400 font-bold':''}"><span class="w-8">${i+1}.</span> <span class="flex-1">${s.username}</span> <span>${clearTime}s</span></li>`;
+                });
+            } else {
+                list.innerHTML = '<li class="text-gray-500">No clear times yet.</li>';
+            }
+        }
+
+        // --- Game Engine ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const TILE_SIZE = 40;
+        const COLS = 15;
+        const ROWS = 15;
+        
+        let gameLoopId;
+        let grid = [];
+        let player = {};
+        let enemies = [];
+        let bullets = [];
+        let gameTime = 0;
+        let lastTime = 0;
+        let isPlaying = false;
+        let keysPressed = {};
+        let totalBatteries = 0;
+        let totalKeys = 0;
+        let swordFragmentsCollected = 0;
+        let totalFragmentsNeeded = 3;
+        let currentLevelFragmentCollected = false;
+        let batteryAlertTimer = 0;
+        let batteryAlertVisible = false;
+        let gameMessageTimer = 0;
+
+        // Toggling walls (Level 2)
+        let wallTimer = 0;
+        let wallsOpen = false;
+
+        function startGame() {
+            stopGameLoop();
+            showScreen('game-screen');
+            sfx.startBgm();
+            
+            // UI Setup
+            document.getElementById('hud-name').innerText = currentUser;
+            document.getElementById('hud-level').innerText = currentLevel;
+            if(currentLevel === 3 || currentLevel === 4) {
+                document.getElementById('hud-hp-container').classList.remove('hidden');
+                document.getElementById('hud-ammo-container').classList.remove('hidden');
+                document.getElementById('control-f').classList.remove('hidden');
+                document.getElementById('boss-hp-container').classList.toggle('hidden', currentLevel !== 4);
+            } else {
+                document.getElementById('hud-hp-container').classList.add('hidden');
+                document.getElementById('hud-ammo-container').classList.add('hidden');
+                document.getElementById('control-f').classList.add('hidden');
+                document.getElementById('boss-hp-container').classList.add('hidden');
+            }
+
+            // Init State
+            if(currentLevel === 1) {
+                swordFragmentsCollected = 0;
+            }
+            currentLevelFragmentCollected = currentLevel === 4;
+            finalBoss = null;
+            player = {
+                x: 1, y: 1, targetX: 1, targetY: 1, 
+                hp: 100, maxHp: 100, 
+                power: 100, 
+                battCount: 0, hasKey: false, hasFragment: false,
+                fragmentsCollected: swordFragmentsCollected,
+                score: 0, ammo: 5,
+                faceX: 1, faceY: 0,
+                echoActive: 0
+            };
+            if (currentLevel === 4) {
+                player.hasFragment = true;
+                player.hasKey = true;
+                player.fragmentsCollected = 3;
+                swordFragmentsCollected = 3;
+                finalBoss = {x: 7, y: 7, hp: 12, maxHp: 12};
+            }
+            enemies = [];
+            bullets = [];
+            gameTime = 0;
+            lastTime = performance.now();
+            isPlaying = true;
+            wallTimer = 0;
+            wallsOpen = false;
+
+            // Parse Map
+            grid = [];
+            const mapStr = levelMaps[currentLevel];
+            totalBatteries = 0;
+            totalKeys = 0;
+            for(let y=0; y<ROWS; y++) {
+                grid[y] = [];
+                for(let x=0; x<COLS; x++) {
+                    const char = mapStr[y][x];
+                    let type = parseInt(char);
+                    if(char === '3') totalKeys++;
+                    if(char === '4') totalBatteries++;
+                    if(type === 5) { player.x = x; player.y = y; player.targetX = x; player.targetY = y; type = 0; }
+                    if(type === 7) { enemies.push({x, y, targetX: x, targetY: y, timer:0, hp: 2}); type = 0; }
+                    grid[y][x] = type;
+                }
+            }
+
+            hideBatteryAlert();
+            hideGameMessage();
+            if (currentLevel === 4) {
+                showGameMessage('The Shadow Maw is in the arena. Get close and press F to strike it!', 4);
+            }
+            updateHUD();
+            gameLoopId = requestAnimationFrame(loop);
+        }
+
+        // Controls
+        window.addEventListener('keydown', (e) => {
+            if(!isPlaying) return;
+            keysPressed[e.code] = true;
+            
+            if(e.code === 'Space') {
+                e.preventDefault();
+                if(player.power >= 20) {
+                    player.power -= 20;
+                    player.echoActive = 5; // 5 seconds
+                    sfx.echo();
+                    updateHUD();
+                } else {
+                    showBatteryAlert();
+                    updateHUD();
+                }
+            }
+            if(e.code === 'KeyF' && (currentLevel === 3 || currentLevel === 4)) {
+                if (currentLevel === 4 && finalBoss) {
+                    const dx = finalBoss.x - Math.round(player.x);
+                    const dy = finalBoss.y - Math.round(player.y);
+                    if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+                        finalBoss.hp = Math.max(0, finalBoss.hp - 2);
+                        sfx.hurt();
+                        if (finalBoss.hp <= 0) {
+                            showGameMessage('The Shadow Maw has been defeated!');
+                        } else {
+                            showGameMessage('You struck the Shadow Maw!');
+                        }
+                        updateHUD();
+                    }
+                } else if(player.ammo > 0) {
+                    player.ammo--;
+                    bullets.push({
+                        x: player.x + player.faceX,
+                        y: player.y + player.faceY,
+                        dx: player.faceX,
+                        dy: player.faceY,
+                        life: 10 // tiles
+                    });
+                    sfx.shoot();
+                    updateHUD();
+                }
+            }
+        });
+        window.addEventListener('keyup', (e) => { keysPressed[e.code] = false; });
+
+        function attemptMove(dx, dy) {
+            // Wait for interpolation to finish before accepting new move
+            if (player.x !== player.targetX || player.y !== player.targetY) return;
+            
+            player.faceX = dx; player.faceY = dy;
+            const nx = player.x + dx;
+            const ny = player.y + dy;
+            
+            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+                const t = grid[ny][nx];
+                if (t !== 1 && t !== 6) { // 1 = solid, 6 = closed toggle door
+                    // Interact
+                    if (t === 2) {
+                        if (currentLevel === 4) {
+                            if (finalBoss && finalBoss.hp <= 0) {
+                                winGame();
+                            } else {
+                                showGameMessage('The Shadow Maw still lives. Strike it down first!');
+                            }
+                            return;
+                        }
+                        if (player.hasKey && currentLevelFragmentCollected) winGame();
+                        else {
+                            const missingItems = [];
+                            if (!player.hasKey) missingItems.push('key');
+                            if (!currentLevelFragmentCollected) missingItems.push('sword fragment');
+                            showGameMessage(`You need the ${missingItems.join(' and ')} to unlock the gate.`);
+                            return;
+                        }
+                    } else {
+                        player.targetX = nx;
+                        player.targetY = ny;
+                        sfx.step();
+                        if(t === 3) { // Key
+                            player.hasKey = true;
+                            player.score += 100;
+                            grid[ny][nx] = 0;
+                            sfx.key();
+                            showGameMessage('Key collected! The exit is now unlocked when you also have the fragment.');
+                        }
+                        if(t === 8) { // Sword fragment
+                            currentLevelFragmentCollected = true;
+                            player.hasFragment = true;
+                            swordFragmentsCollected += 1;
+                            player.fragmentsCollected = swordFragmentsCollected;
+                            player.score += 250;
+                            grid[ny][nx] = 0;
+                            sfx.key();
+                            showGameMessage(swordFragmentsCollected >= totalFragmentsNeeded ? 'All sword pieces have been collected!' : 'Sword fragment recovered!');
+                        }
+                        if(t === 4) { // Battery
+                            player.power = Math.min(100, player.power + 20);
+                            player.battCount++;
+                            player.score += 30;
+                            grid[ny][nx] = 0;
+                            hideBatteryAlert();
+                            sfx.battery();
+                        }
+                        updateHUD();
+                    }
+                }
+            }
+        }
+
+        function showBatteryAlert() {
+            const alertBox = document.getElementById('battery-alert');
+            alertBox.classList.remove('hidden');
+            alertBox.classList.add('flex');
+            batteryAlertVisible = true;
+            batteryAlertTimer = 1.2;
+        }
+
+        function hideBatteryAlert() {
+            const alertBox = document.getElementById('battery-alert');
+            alertBox.classList.add('hidden');
+            alertBox.classList.remove('flex');
+            batteryAlertVisible = false;
+            batteryAlertTimer = 0;
+        }
+
+        function showGameMessage(msg, timeout = 2) {
+            const el = document.getElementById('game-message');
+            el.innerText = msg;
+            el.classList.remove('hidden');
+            gameMessageTimer = timeout;
+        }
+
+        function hideGameMessage() {
+            const el = document.getElementById('game-message');
+            el.innerText = '';
+            el.classList.add('hidden');
+            gameMessageTimer = 0;
+        }
+
+        function countRemainingItems(type) {
+            let count = 0;
+            for(let y=0; y<ROWS; y++) {
+                for(let x=0; x<COLS; x++) {
+                    if(grid[y][x] === type) count++;
+                }
+            }
+            return count;
+        }
+
+        function updateHUD() {
+            document.getElementById('hud-score').innerText = player.score;
+            document.getElementById('hud-time').innerText = Math.floor(gameTime);
+            const powerPercent = Math.max(0, Math.round(player.power));
+            document.getElementById('hud-power').style.width = powerPercent + '%';
+            document.getElementById('hud-battery-percent').innerText = powerPercent + '%';
+            document.getElementById('hud-batt').innerText = player.battCount;
+            document.getElementById('hud-key').innerText = player.hasKey ? 'YES' : 'NO';
+            document.getElementById('hud-key').className = player.hasKey ? 'text-green-500 font-bold' : 'text-red-500 font-bold';
+            document.getElementById('hud-battery-left').innerText = `${player.battCount}/${totalBatteries}`;
+            document.getElementById('hud-key-left').innerText = `${swordFragmentsCollected}/${totalFragmentsNeeded}`;
+            document.getElementById('hud-fragments').innerText = `${swordFragmentsCollected}/${totalFragmentsNeeded}`;
+            
+            if(currentLevel === 3 || currentLevel === 4) {
+                document.getElementById('hud-hp').style.width = player.hp + '%';
+                document.getElementById('hud-ammo').innerText = currentLevel === 3 ? player.ammo : '∞';
+            }
+            if (currentLevel === 4 && finalBoss) {
+                document.getElementById('boss-hp').style.width = `${(finalBoss.hp / finalBoss.maxHp) * 100}%`;
+            }
+        }
+
+        function loop(timestamp) {
+            if(!isPlaying) return;
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+            gameTime += dt;
+            
+            update(dt);
+            draw();
+            
+            if(isPlaying) requestAnimationFrame(loop);
+        }
+
+        function update(dt) {
+            if (batteryAlertVisible) {
+                batteryAlertTimer -= dt;
+                if (batteryAlertTimer <= 0) hideBatteryAlert();
+            }
+
+            if (gameMessageTimer > 0) {
+                gameMessageTimer -= dt;
+                if (gameMessageTimer <= 0) hideGameMessage();
+            }
+
+            // Player Echo
+            if (player.echoActive > 0) {
+                player.echoActive -= dt;
+                if (player.echoActive < 0) player.echoActive = 0;
+            }
+
+            // Player Input
+            if (keysPressed['ArrowUp'] || keysPressed['KeyW']) attemptMove(0, -1);
+            else if (keysPressed['ArrowDown'] || keysPressed['KeyS']) attemptMove(0, 1);
+            else if (keysPressed['ArrowLeft'] || keysPressed['KeyA']) attemptMove(-1, 0);
+            else if (keysPressed['ArrowRight'] || keysPressed['KeyD']) attemptMove(1, 0);
+
+            // Interpolate player position
+            if(player.x < player.targetX) player.x = Math.min(player.targetX, player.x + dt*8);
+            if(player.x > player.targetX) player.x = Math.max(player.targetX, player.x - dt*8);
+            if(player.y < player.targetY) player.y = Math.min(player.targetY, player.y + dt*8);
+            if(player.y > player.targetY) player.y = Math.max(player.targetY, player.y - dt*8);
+
+            // Level 2 Walls
+            if(currentLevel === 2) {
+                wallTimer += dt;
+                if(wallTimer > 3) {
+                    wallTimer = 0;
+                    wallsOpen = !wallsOpen;
+                    // In grid, 6 is closed door. We map visually, but logically let's swap 6 and 0 if it was a door.
+                    // Actually, simpler: in attemptMove, check if wallsOpen and t===6. Let's adjust attemptMove.
+                    // Wait, I coded `t !== 6` as solid. Let's dynamically change grid.
+                    for(let y=0; y<ROWS; y++) {
+                        for(let x=0; x<COLS; x++) {
+                            // Find toggle spots from initial map
+                            if(levelMaps[2][y][x] === '6') {
+                                grid[y][x] = wallsOpen ? 0 : 6;
+                            }
+                        }
+                    }
+                    sfx.step(); // mechanical click
+                }
+            }
+
+            if (currentLevel === 4 && finalBoss) {
+                const bossDx = Math.round(player.x) - finalBoss.x;
+                const bossDy = Math.round(player.y) - finalBoss.y;
+                if (Math.abs(bossDx) <= 1 && Math.abs(bossDy) <= 1) {
+                    player.hp -= 12 * dt;
+                    updateHUD();
+                    if(player.hp <= 0) {
+                        player.hp = 0;
+                        loseGame();
+                    }
+                }
+            }
+
+            // Bullets
+            for(let i=bullets.length-1; i>=0; i--) {
+                let b = bullets[i];
+                b.x += b.dx * dt * 10;
+                b.y += b.dy * dt * 10;
+                
+                // collision with wall
+                let bx = Math.round(b.x), by = Math.round(b.y);
+                if(bx<0 || bx>=COLS || by<0 || by>=ROWS || grid[by][bx] === 1) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+                
+                if (currentLevel === 4 && finalBoss) {
+                    if (Math.abs(b.x - finalBoss.x) < 0.8 && Math.abs(b.y - finalBoss.y) < 0.8) {
+                        finalBoss.hp--;
+                        bullets.splice(i, 1);
+                        sfx.hurt();
+                        if (finalBoss.hp <= 0) {
+                            showGameMessage('The Shadow Maw has been defeated!');
+                            updateHUD();
+                        }
+                        break;
+                    }
+                }
+
+                // collision with enemy
+                for(let j=enemies.length-1; j>=0; j--) {
+                    let e = enemies[j];
+                    if(Math.abs(b.x - e.x) < 0.8 && Math.abs(b.y - e.y) < 0.8) {
+                        e.hp--;
+                        bullets.splice(i, 1);
+                        if(e.hp <= 0) {
+                            player.score += 80;
+                            enemies.splice(j, 1);
+                            updateHUD();
+                        }
+                        sfx.hurt();
+                        break;
+                    }
+                }
+            }
+
+            // Enemies (Level 3)
+            enemies.forEach(e => {
+                // Interpolate
+                if(e.x < e.targetX) e.x = Math.min(e.targetX, e.x + dt*4);
+                if(e.x > e.targetX) e.x = Math.max(e.targetX, e.x - dt*4);
+                if(e.y < e.targetY) e.y = Math.min(e.targetY, e.y + dt*4);
+                if(e.y > e.targetY) e.y = Math.max(e.targetY, e.y - dt*4);
+
+                e.timer += dt;
+                if(e.timer > 1.0 && e.x === e.targetX && e.y === e.targetY) {
+                    e.timer = 0;
+                    // Simple AI: move toward player
+                    let dx = Math.round(player.x) - Math.round(e.x);
+                    let dy = Math.round(player.y) - Math.round(e.y);
+                    
+                    let moveX = 0, moveY = 0;
+                    if(Math.abs(dx) > Math.abs(dy)) moveX = Math.sign(dx);
+                    else moveY = Math.sign(dy);
+
+                    if(moveX !== 0 && grid[Math.round(e.y)][Math.round(e.x + moveX)] === 0) {
+                        e.targetX = Math.round(e.x + moveX);
+                    } else if (moveY !== 0 && grid[Math.round(e.y + moveY)][Math.round(e.x)] === 0) {
+                        e.targetY = Math.round(e.y + moveY);
+                    }
+                }
+                
+                // Attack player
+                if(Math.abs(e.x - player.x) < 0.8 && Math.abs(e.y - player.y) < 0.8) {
+                    if(player.hp > 0) {
+                        player.hp -= 20 * dt; // DPS
+                        sfx.hurt();
+                        updateHUD();
+                        if(player.hp <= 0) {
+                            player.hp = 0;
+                            loseGame();
+                        }
+                    }
+                }
+            });
+
+            // Score Time Penalty update every second
+            if(Math.floor(gameTime) > Math.floor(gameTime-dt)) {
+                updateHUD();
+            }
+        }
+
+        function draw() {
+            // Background / Floor
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Grid
+            for(let y=0; y<ROWS; y++) {
+                for(let x=0; x<COLS; x++) {
+                    const t = grid[y][x];
+                    const px = x * TILE_SIZE;
+                    const py = y * TILE_SIZE;
+                    
+                    if(t === 1 || t === 6) { // Wall / Door
+                        ctx.fillStyle = t===1 ? '#222' : (wallsOpen ? '#111' : '#422');
+                        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                        ctx.strokeStyle = t===1 ? '#333' : '#633';
+                        ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+                    }
+                    else if(t === 2) { // Exit
+                        ctx.fillStyle = currentLevelFragmentCollected ? '#0f0' : '#500';
+                        ctx.fillRect(px+5, py+5, TILE_SIZE-10, TILE_SIZE-10);
+                        ctx.fillStyle = '#000';
+                        ctx.fillText("EXIT", px+8, py+25);
+                    }
+                    else if(t === 3) { // Key
+                        ctx.save();
+                        ctx.translate(px + 20, py + 20);
+                        ctx.strokeStyle = '#ffd700';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(-8, 8);
+                        ctx.lineTo(-2, 2);
+                        ctx.lineTo(0, 6);
+                        ctx.lineTo(8, -2);
+                        ctx.lineTo(4, -6);
+                        ctx.lineTo(-2, 0);
+                        ctx.lineTo(-8, 8);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.arc(6, -6, 3, 0, Math.PI * 2);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(-4, 8);
+                        ctx.lineTo(-8, 12);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                    else if(t === 4) { // Battery
+                        ctx.save();
+                        ctx.translate(px + 20, py + 20);
+                        ctx.fillStyle = '#1e40af';
+                        ctx.fillRect(-8, -10, 16, 20);
+                        ctx.fillStyle = '#60a5fa';
+                        ctx.fillRect(-6, -8, 12, 16);
+                        ctx.fillStyle = '#f8fafc';
+                        ctx.fillRect(-4, -6, 8, 12);
+                        ctx.fillStyle = '#facc15';
+                        ctx.fillRect(-2, -12, 4, 4);
+                        ctx.restore();
+                    }
+                    else if(t === 8) { // Sword fragment
+                        ctx.save();
+                        ctx.translate(px + 20, py + 20);
+                        ctx.strokeStyle = '#fde68a';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(-8, 8);
+                        ctx.lineTo(0, -2);
+                        ctx.lineTo(8, -8);
+                        ctx.lineTo(4, -2);
+                        ctx.lineTo(10, 2);
+                        ctx.lineTo(2, 6);
+                        ctx.lineTo(-8, 8);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(-2, 6);
+                        ctx.lineTo(-6, 12);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
+            }
+
+            if (currentLevel === 4 && finalBoss) {
+                ctx.save();
+                ctx.shadowBlur = 24;
+                ctx.shadowColor = '#ff0000';
+
+                const bx = finalBoss.x * TILE_SIZE + 20;
+                const by = finalBoss.y * TILE_SIZE + 20;
+
+                ctx.fillStyle = '#4b0f0f';
+                ctx.beginPath();
+                ctx.moveTo(bx - 16, by + 6);
+                ctx.lineTo(bx - 22, by - 10);
+                ctx.lineTo(bx - 10, by - 16);
+                ctx.lineTo(bx - 2, by - 22);
+                ctx.lineTo(bx + 8, by - 16);
+                ctx.lineTo(bx + 22, by - 10);
+                ctx.lineTo(bx + 16, by + 6);
+                ctx.lineTo(bx + 18, by + 18);
+                ctx.lineTo(bx + 10, by + 24);
+                ctx.lineTo(bx + 2, by + 22);
+                ctx.lineTo(bx - 6, by + 24);
+                ctx.lineTo(bx - 18, by + 18);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#8b0000';
+                ctx.beginPath();
+                ctx.arc(bx, by, 14, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#ff6666';
+                ctx.beginPath();
+                ctx.arc(bx - 5, by - 3, 3, 0, Math.PI * 2);
+                ctx.arc(bx + 5, by - 3, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#000';
+                ctx.fillRect(bx - 7, by + 4, 4, 4);
+                ctx.fillRect(bx + 3, by + 4, 4, 4);
+                ctx.fillRect(bx - 8, by + 13, 16, 4);
+
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(bx - 18, by + 6, 6, 10);
+                ctx.fillRect(bx + 12, by + 6, 6, 10);
+                ctx.fillRect(bx - 10, by + 18, 8, 10);
+                ctx.fillRect(bx + 2, by + 18, 8, 10);
+
+                ctx.restore();
+            }
+
+            // Draw Enemies
+            enemies.forEach(e => {
+                ctx.fillStyle = '#f00';
+                ctx.beginPath();
+                ctx.arc(e.x*TILE_SIZE + 20, e.y*TILE_SIZE + 20, 12, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = '#000'; // Eyes
+                ctx.fillRect(e.x*TILE_SIZE + 15, e.y*TILE_SIZE + 15, 4, 4);
+                ctx.fillRect(e.x*TILE_SIZE + 21, e.y*TILE_SIZE + 15, 4, 4);
+            });
+
+            // Draw Bullets
+            ctx.fillStyle = '#ff0';
+            bullets.forEach(b => {
+                ctx.beginPath();
+                ctx.arc(b.x*TILE_SIZE + 20, b.y*TILE_SIZE + 20, 4, 0, Math.PI*2);
+                ctx.fill();
+            });
+
+            // Mild ambient dimming only so the maze and boss stay visible
+            const dimAlpha = currentLevel === 4 ? 0.06 : (player.echoActive > 0 ? 0.18 : 0.12);
+            ctx.save();
+            ctx.fillStyle = `rgba(0, 0, 0, ${dimAlpha})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+
+            // Draw Player (Always Visible on top of Darkness)
+            ctx.fillStyle = '#39ff14'; // Neon Green
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#39ff14';
+            ctx.beginPath();
+            ctx.arc(player.x*TILE_SIZE + 20, player.y*TILE_SIZE + 20, 10, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Direction Indicator
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(player.x*TILE_SIZE + 20 + player.faceX*8, player.y*TILE_SIZE + 20 + player.faceY*8, 3, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        async function winGame() {
+            isPlaying = false;
+            sfx.stopBgm();
+            sfx.win();
+            
+            const elapsedSeconds = Math.floor(gameTime);
+            player.score += 400;
+            
+            document.getElementById('vic-score').innerText = player.score;
+            document.getElementById('vic-time').innerText = elapsedSeconds;
+            
+            if (currentLevel >= 1 && currentLevel <= 3) {
+                fragmentProgress[currentLevel] = true;
+                saveFragmentProgress();
+            }
+
+            const recovered = Object.values(fragmentProgress).filter(Boolean).length;
+            if (recovered >= 3) {
+                finalBossUnlocked = true;
+            }
+
+            // Unlock next
+            if(currentLevel < 3 && unlockedLevel === currentLevel) {
+                unlockedLevel++;
+            }
+            const btnNext = document.getElementById('btn-next-level');
+            btnNext.style.display = currentLevel < 3 ? 'inline-block' : 'none';
+            
+            if(currentLevel === 4 || (currentLevel === 3 && swordFragmentsCollected >= totalFragmentsNeeded)) {
+                showScreen('boss-screen');
+            } else {
+                showScreen('victory-screen');
+            }
+
+            // Save Progress and Clear Time
+            await api('progress', { username: currentUser, level: unlockedLevel });
+            await api('score', { username: currentUser, level: currentLevel, time: elapsedSeconds });
+            updateMenu();
+        }
+
+        async function loseGame() {
+            isPlaying = false;
+            sfx.stopBgm();
+            document.getElementById('go-score').innerText = player.score;
+            showScreen('gameover-screen');
+        }
+
+    </script>
+</body>
+</html>
